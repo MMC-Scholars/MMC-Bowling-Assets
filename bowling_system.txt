@@ -1,0 +1,193 @@
+#include "bowling_pin.h"
+#include "bowling_frame.h"
+#include "bowling_shared.h"
+
+
+
+
+
+private:
+	//the number of the frame we're in, starting from 0
+	int frameIndex;
+
+	//we have an an array of references to our 10 pins
+	Abowling_pin ArrPins[10];
+
+	//we have an array of 11 bowling frames that we'll use to score
+	bowling_frame Frames[11];
+
+	// Called on BeginPlay();, assigns pins whose names are given to our pointer array of pins
+	void AssignPins();
+
+	
+
+public:	
+
+
+	// Sets default values for this actor's properties
+	Abowling_system();
+	
+	bool gameover;
+
+	//enumerator for the score type, for getting the different type of scores
+	enum ScoreType {FirstThrow, SecondThrow, NativeScore, AbsoluteNativeScore, AbsoluteScore};
+
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+	
+	// Called every frame
+	virtual void Tick( float DeltaSeconds ) override;
+
+	//calculates all of the absolute scores and absolute native scores for the frames
+	void CalculateAbsoluteScores();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "bowling_system")
+		int strikeCount;
+
+	//Counts the fallen bowling pins, and calculates the score for the current frame.
+	//handles the strike count and strike/spare bonuses
+	UFUNCTION(BlueprintCallable, Category = "bowling_system")
+		void CalculateScore();
+
+	//Given a frame number and a score type, returns the desired score
+	UFUNCTION(BlueprintCallable, Category = "bowling_system")
+		int GetScoreOfFrame(int frameNumber, ScoreType type);
+
+	//Resets all the scores of the game
+	UFUNCTION(BlueprintCallable, Category = "bowling_system")
+		int ResetGame();
+
+	//Returns the total score for the game, i.e. the absolute score of the current frame.
+	UFUNCTION(BlueprintCallable, Category = "bowling_system")
+		int GetAbsoluteScore();
+
+	//Returns the number of the current frame, 1-11
+	UFUNCTION(BlueprintCallable, Category = "bowling_system")
+		int GetNumberOfCurrentFrame();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "bowling_system")
+		void OnStrike();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "bowling_system")
+		void OnSpare();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "bowling_system")
+		void OnGameover();
+
+
+
+
+
+Abowling_system::Abowling_system()
+{
+ 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = false;
+
+	// Make the 11th frame know that it's the last one
+	Frames[10].isLast = true;
+
+
+	
+
+
+}
+
+// Called when the game starts or when spawned
+void Abowling_system::BeginPlay()
+{
+	Super::BeginPlay();
+
+	AssignPins();
+
+	ResetGame();
+}
+
+// Called every frame
+void Abowling_system::Tick( float DeltaTime )
+{
+	Super::Tick( DeltaTime );
+
+}
+
+//calculates all of the absolute scores and absolute native scores for the frames
+void Abowling_system::CalculateAbsoluteScores()
+{
+
+}
+
+//Counts the fallen bowling pins, and calculates the score for the current frame.
+//handles the strike count and strike/spare bonuses
+void Abowling_system::CalculateScore()
+{
+	//never calculate anything if the game is already over
+	if (gameover)
+		return;
+	//find the number of pins that have fallen
+	int pinCount = 0;
+	for (int i = 0; i < ArrPins.size(); i++)
+		if (ArrPins[i].CheckForFallen())
+			pinCount++;
+
+	//throw the number of fallen pins to the current frame
+	bowling_frame& curFrame = Frames[frameIndex];
+	curFrame.Throw(pinCount);
+
+	//check if the game is over
+	if (curFrame.isLast)
+		gameover = true;
+
+	//increment the frame index if we need to
+	if ((!gameover) && (curFrame.wasStrike || curFrame.GetThrowScore(2) != NOT_THROWN))
+		frameIndex++;
+	
+	//Re-calculate the absolute scores for each frame
+	CalculateAbsoluteScores();
+
+	
+}
+
+//Given a frame number and a score type, returns the desired score
+int Abowling_system::GetScoreOfFrame(int frameNumber, ScoreType type)
+{
+	//we'll let blueprinters start from 1
+	frameNumber--;
+
+	if (type == FirstThrow)
+		return Frames[frameNumber].GetThrowScore(1);
+	if (type == SecondThrow)
+		return Frames[frameNumber].GetThrowScore(2);
+	if (type == NativeScore)
+		return Frames[frameNumber].GetNativeScore();
+	if (type == AbsoluteNativeScore)
+		return Frames[frameNumber].GsetAbsoluteNativeScore();
+	if (type == AbsoluteScore)
+		return Frames[frameNumber].GsetAbsoluteScore;
+
+	return NOT_THROWN;
+}
+
+//Resets all the scores of the game
+void Abowling_system::ResetGame()
+{
+	strikeCount = 0;
+	frameIndex = 0;
+	gameover = false;
+
+	//reset all frames
+	for (int i = 0; i < Frames.size(); i++)
+	{
+		Frames[i].ResetFrame();
+	}
+}
+
+//Returns the total score for the game, i.e. the absolute score of the current frame.
+int Abowling_system::GetAbsoluteScore()
+{
+	return Frames[frameIndex].GsetAbsoluteScore();
+}
+
+//Returns the number of the current frame, 1-11
+int Abowling_system::GetNumberOfCurrentFrame()
+{
+	return frameIndex - 1;
+}
