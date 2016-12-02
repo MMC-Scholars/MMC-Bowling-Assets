@@ -2,23 +2,22 @@
 
 #pragma once
 
-#include "GameFramework/Actor.h"
+#include "entity_base.h"
 #include "bowling_pin.generated.h"
 
 UCLASS()
-class CODEDEMO2_API Abowling_pin : public AActor
+class CODEDEMO2_API Abowling_pin : public Aentity_base
 {
 	GENERATED_BODY()
 	
 public:	
 
-	static Abowling_pin * ArrPins[10];
-	static int pinIndex;
+	bool didFall;
+	bool isRaisingAndLowering;
+	bool isLowering;
 
-	bool hasFallen;
-
-	FVector OriginalLocation;
-	FRotator OriginalRotation;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "bowling_pin")
+		bool isInGame = false;
 
 	// Sets default values for this actor's properties
 	Abowling_pin();

@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "CodeDemo2.h"
+#include "EngineUtils.h"
 #include "bowling_system.h"
 
 
@@ -10,8 +11,11 @@ Abowling_system::Abowling_system()
 	PrimaryActorTick.bCanEverTick = false;
 
 	//initialize frames
-	for (int i = 0; i < Frames.size(); i++)
-		Frames[i] = new bowling_frame();
+	Frames = TArray<bowling_frame, FDefaultAllocator>();
+	for (int i = 0; i < Frames.Num(); i++)
+		Frames[i] = bowling_frame();
+
+	bowling_frame& lastFrame = Frames[Frames.Num() - 1];
 
 	// Make the last frame know that it's the last one
 	lastFrame.isLast = true;
@@ -24,9 +28,7 @@ void Abowling_system::BeginPlay()
 {
 	Super::BeginPlay();
 
-	AssignPins();
-
-	ResetGame();
+	ResetGame(); //sets defaults
 }
 
 // Called every frame
@@ -37,18 +39,18 @@ void Abowling_system::Tick(float DeltaTime)
 }
 
 // Called on BeginPlay();, assigns pins whose names are given to our array of pins
-void AssignPins();
+//void AssignPins(); //unused
 
 //checks the last frames to determine the current endgame type
 void Abowling_system::CalculateEndgameType()
 {
-	bowling_frame& lastNormalFrame	= Frames[Frames.size() - 3];
-	if (frameIndex <= Frames.size() - 3) //we're in the ninth frame or before
+	bowling_frame& lastNormalFrame	= Frames[Frames.Num() - 3];
+	if (frameIndex <= Frames.Num() - 3) //we're in the ninth frame or before
 	{
 		endgameType = Undetermined;
 		return;
 	}
-	if (frameIndex == Frames.size() - 2) //we're in the last normal frame
+	if (frameIndex == Frames.Num() - 2) //we're in the last normal frame
 	{
 		if (lastNormalFrame.wasSpare) //if it was a spare
 		{
@@ -72,8 +74,9 @@ void Abowling_system::CalculateEndgameType()
 //Checks the last frames to determine if the game is over
 bool Abowling_system::CheckForGameover()
 {
-	bowling_frame& lastFrame		= Frames[Frames.size() - 1];
-	bowling_frame& scdLastFrame		= Frames[Frames.size() - 2];
+	bowling_frame& curFrame			= Frames[frameIndex];
+	bowling_frame& lastFrame		= Frames[Frames.Num() - 1];
+	bowling_frame& scdLastFrame		= Frames[Frames.Num() - 2];
 
 	if (
 		curFrame.isLast
@@ -93,14 +96,14 @@ bool Abowling_system::CheckForGameover()
 void Abowling_system::ReCalculateAbsoluteScores()
 {
 	//first SET all the absoluteNativeScores to their native scores
-	for (int i = 0; i < Frames.size(); i++)
+	for (int i = 0; i < Frames.Num(); i++)
 	{
 		Frames[i].GsetAbsoluteNativeScore(Frames[i].GetNativeScore(), OVERRIDE_TYPE_SET);
 	}
 
 	//then add strike/spare bonuses to absolute native scores, handling the first 10 frames normally and then handling last 2 specially.
 	//also toggles scoreIsPending for all applicable frames
-	for (int i = 0; i < Frames.size()-2 ; i++)
+	for (int i = 0; i < Frames.Num()-2 ; i++)
 	{
 		int bonusAmount = 0;
 		if (Frames[i].wasStrike && Frames[i + 1].GetThrowScore(1) != NOT_THROWN) //handle strike
@@ -132,8 +135,8 @@ void Abowling_system::ReCalculateAbsoluteScores()
 		Frames[i].GsetAbsoluteNativeScore(bonusAmount, OVERRIDE_TYPE_ADD);
 	}
 
-	bowling_frame& lastFrame		= Frames[Frames.size() - 1];
-	bowling_frame& scdLastFrame		= Frames[Frames.size() - 2];
+	bowling_frame& lastFrame		= Frames[Frames.Num() - 1];
+	bowling_frame& scdLastFrame		= Frames[Frames.Num() - 2];
 
 	//handle last two frames seperately
 	{
@@ -151,7 +154,7 @@ void Abowling_system::ReCalculateAbsoluteScores()
 	
 	//then finally calculate the running count and absolute scores 
 	int runningScore = 0;
-	for (int i = 0; i < Frames.size(); i++)
+	for (int i = 0; i < Frames.Num(); i++)
 	{
 		if (!Frames[i].scoreIsPending)
 		{
@@ -164,16 +167,26 @@ void Abowling_system::ReCalculateAbsoluteScores()
 
 //Counts the fallen bowling pins, and calculates the score for the current frame.
 //calls for the handling of the strike count and strike/spare bonuses
+//calls for the re-counting of absoluteScore's
 void Abowling_system::CalculateScore()
 {
 	//never calculate anything if the game is already over
 	if (gameover)
 		return;
+	
+	bowling_frame& curFrame = Frames[frameIndex];
+
 	//find the number of pins that have fallen
 	int pinCount = 0;
-	for (int i = 0; i < ArrPins.size(); i++)
-		if (ArrPins[i].CheckForFallen())
+
+	for (TActorIterator<Abowling_pin> ActorItr(GetWorld()); ActorItr; ++ActorItr)
+	{
+		Abowling_pin * curPin = *ActorItr;
+		if (curFrame.GetThrowScore(1) == NOT_THROWN)
+			curPin->didFall = false; //make sure the pins don't remember having fallen if we're in the first throw of the frame
+		if (curPin && curPin->isInGame && curPin->CheckForFallen())
 			pinCount++;
+	}
 
 	//increment the strike count, and call OnStrike()
 	{
@@ -187,7 +200,6 @@ void Abowling_system::CalculateScore()
 	}
 
 	//throw the number of fallen pins to the current frame
-	bowling_frame& curFrame = Frames[frameIndex];
 	curFrame.Throw(pinCount);
 
 	//Check if we need to call OnSpare
@@ -238,11 +250,11 @@ FString Abowling_system::GetStringScoreOfFrame(int frameNumber, ScoreType type)
 	if (iScore == NOT_THROWN || Frames[frameNumber].scoreIsPending)
 		sScore = FString(TEXT(" "));
 
-	else if (Frames[frameNumber].wasSpare && type = SecondThrow)
+	else if (Frames[frameNumber].wasSpare && type == SecondThrow)
 		sScore = FString(TEXT("/"));
-	else if (Frames[frameNumber].wasStrike && type = SecondThrow)
+	else if (Frames[frameNumber].wasStrike && type == SecondThrow)
 		sScore = FString(TEXT("X"));
-	else if (iScore == 0 && type = AbsoluteScore)
+	else if (iScore == 0 && type == AbsoluteScore)
 		sScore = FString(TEXT("--"));
 	else if (iScore == 0)
 		sScore = FString(TEXT("-"));
@@ -262,7 +274,7 @@ void Abowling_system::ResetGame()
 	endgameType = Undetermined;
 
 	//reset all frames
-	for (int i = 0; i < Frames.size(); i++)
+	for (int i = 0; i < Frames.Num(); i++)
 	{
 		Frames[i].ResetFrame();
 	}

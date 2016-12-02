@@ -40,11 +40,10 @@ private:
 
 	bool gameover;
 
-	//we have an an array of references to our 10 pins
-	Abowling_pin ArrPins[10];
 
+	
 	//we have an array of 12 bowling frames that we'll use to score. The last 2 are only used if possible
-	bowling_frame Frames[12];
+	TArray<bowling_frame, FDefaultAllocator> Frames;
 
 	//we can't define references to uninitialized frames
 	//bowling_frame& lastFrame		= Frames[Frames.size() - 1];
@@ -52,7 +51,7 @@ private:
 	//bowling_frame& lastNormalFrame	= Frames[Frames.size() - 3];
 
 	// Called on BeginPlay();, assigns pins whose names are given to our array of pins
-	void AssignPins();
+	//void AssignPins(); //we'll do these in CalculateScore() instead
 
 	//checks the last frames to determine the current endgame type
 	void CalculateEndgameType();
